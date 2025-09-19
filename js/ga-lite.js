@@ -6,8 +6,8 @@
 (function() {
     'use strict';
     
-    // Configuration - PLACEHOLDER: Replace with actual measurement ID
-    const GA_MEASUREMENT_ID = 'G-XXXXXXXXXX';
+    // Configuration - Updated with actual measurement ID
+    const GA_MEASUREMENT_ID = 'G-5FM9CX3QSD';
     const PROLIFIC_ID_KEY = 'prolific_id';
     
     // Global tracking state
