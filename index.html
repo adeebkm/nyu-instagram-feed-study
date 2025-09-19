@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>NYU Feed Carousel Study</title>
+    
+    <!-- GA4 Tracking Scripts -->
+    <script src="js/ga-lite.js"></script>
+    <script src="js/ga-carousel.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #fafafa;
+            color: #262626;
+            line-height: 1.4;
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+            margin: 0;
+            min-height: 100vh;
+        }
+
+        .app-container {
+            height: 100vh;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* Main Content Area */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* Feed Pages */
+        .feed-page {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .feed-container {
+            max-width: 470px;
+            margin: 0 auto;
+            background: #fff;
+            width: 100%;
+            height: 100vh;
+            overflow-y: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            overflow-x: hidden;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        /* Mobile responsive adjustments */
+        @media (max-width: 480px) {
+            .feed-container {
+                max-width: 100vw;
+                width: 100vw;
+                margin: 0;
+                height: 100vh;
+                min-height: 100vh;
+                padding-bottom: env(safe-area-inset-bottom, 0px);
+            }
+            
+            body {
+                height: 100vh;
+                min-height: 100vh;
+                overflow: hidden;
+            }
+            
+            .app-container {
+                height: 100vh;
+                min-height: 100vh;
+                overflow: hidden;
+            }
+        }
+
+        .feed-container::-webkit-scrollbar {
+            display: none;
+        }
+
+        .return-survey-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .return-survey-btn:hover {
+            background: rgba(0, 0, 0, 0.9);
+            transform: scale(1.05);
+        }
+
+        .return-survey-btn:active {
+            transform: scale(0.95);
+        }
+
+        .tap-to-start-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            color: white;
+            transition: opacity 0.3s ease;
+        }
+
+        .tap-to-start-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .tap-to-start-icon {
+            width: 80px;
+            height: 80px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .tap-to-start-icon:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(1.1);
+        }
+
+        .tap-to-start-icon svg {
+            width: 40px;
+            height: 40px;
+            fill: white;
+        }
+
+        .tap-to-start-text {
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .ig-header {
+            position: sticky;
+            top: 0;
+            background: #fff;
+            border-bottom: 1px solid #dbdbdb;
+            padding: 10px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .ig-logo {
+            font-size: 24px;
+            font-weight: bold;
+            background: linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-icons {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .heart-icon, .messenger-icon {
+            width: 24px;
+            height: 24px;
+            fill: none;
+            stroke: #262626;
+            stroke-width: 2;
+            cursor: pointer;
+        }
+
+        .messenger-icon {
+            fill: #262626;
+            stroke: none;
+        }
+
+        .posts-container {
+            /* Container for all dynamically generated posts */
+        }
+
+        .post {
+            border-bottom: 1px solid #262626;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+
+        .post-header {
+            display: flex;
+            align-items: center;
+            padding: 14px 16px;
+            justify-content: space-between;
+            margin-bottom: 0;
+        }
+
+        .post-user {
+            display: flex;
+            align-items: center;
+        }
+
+        .profile-pic {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            margin-right: 12px;
+            background: linear-gradient(45deg, #f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%);
+            padding: 2px;
+        }
+
+        .profile-pic img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .username {
+            font-weight: 600;
+            font-size: 14px;
+            color: #262626;
+        }
+
+        .post-location {
+            font-size: 12px;
+            color: #737373;
+            margin-top: 2px;
+        }
+
+        .post-more {
+            color: #262626;
+            background: none;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .post-media {
+            width: 100%;
+            position: relative;
+        }
+
+        /* Mobile responsive media */
+        @media (max-width: 480px) {
+            /* Account for home indicator/gesture bar */
+            .feed-container {
+                padding-bottom: env(safe-area-inset-bottom, 20px);
+            }
+            
+            .post {
+                margin-bottom: 20px;
+                border: none;
+                box-shadow: none;
+                width: 100vw;
+                margin-left: calc(-50vw + 50%);
+                background: #fff;
+                padding-bottom: env(safe-area-inset-bottom, 20px);
+            }
+            
+            .post-media {
+                width: 100vw;
+                margin-left: calc(-50vw + 50%);
+                overflow: hidden;
+            }
+            
+            .feed-carousel {
+                width: 100vw;
+                height: auto !important;
+                margin-left: calc(-50vw + 50%);
+                background: transparent;
+            }
+            
+            .feed-carousel img {
+                width: 100vw !important;
+                max-width: 100vw !important;
+                height: auto !important;
+                object-fit: contain !important;
+                position: relative;
+            }
+            
+            .post {
+                margin-bottom: 20px;
+                border: none;
+                box-shadow: none;
+                width: 100vw;
+                margin-left: calc(-50vw + 50%);
+                background: #fff;
+            }
+            
+            .post-header, .post-actions, .likes-count, .post-caption, .post-comments, .post-timestamp {
+                margin-left: calc(50vw - 50%);
+                width: calc(100% - 32px);
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+        }
+
+        .feed-carousel {
+            position: relative;
+            width: 100%;
+            height: 750px;
+            background: #fff;
+            overflow: hidden;
+            cursor: grab;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+        }
+
+        .feed-carousel:active {
+            cursor: grabbing;
+        }
+
+        .feed-carousel img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: none;
+            pointer-events: none;
+            -webkit-user-drag: none;
+            -khtml-user-drag: none;
+            -moz-user-drag: none;
+            -o-user-drag: none;
+            user-drag: none;
+        }
+
+        .feed-carousel img.active {
+            display: block;
+        }
+
+        .carousel-dots {
+            position: absolute;
+            bottom: 28px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 4px;
+            z-index: 100;
+            pointer-events: auto;
+        }
+
+        .carousel-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.7);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .carousel-dot.active {
+            background: #fff;
+            transform: scale(1.2);
+        }
+
+        .ad-badge {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background: rgba(0,0,0,0.6);
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .post-actions {
+            display: flex;
+            align-items: center;
+            padding: 8px 16px;
+            gap: 16px;
+        }
+
+        .action-icon {
+            width: 24px;
+            height: 24px;
+            color: #262626;
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+
+        .action-icon:active {
+            transform: scale(0.9);
+        }
+
+        .post-actions .action-icon:last-child {
+            margin-left: auto;
+        }
+
+        .likes-count {
+            font-weight: 600;
+            font-size: 14px;
+            padding: 0 16px 8px;
+            color: #262626;
+            margin-bottom: 4px;
+        }
+
+        .post-caption {
+            padding: 0 16px 8px;
+            font-size: 14px;
+            line-height: 1.4;
+            color: #262626;
+            margin-bottom: 4px;
+        }
+
+        .post-comments {
+            padding: 0 16px 8px;
+            font-size: 14px;
+            color: #737373;
+            cursor: pointer;
+            margin-bottom: 4px;
+        }
+
+        .post-timestamp {
+            padding: 0 16px 16px;
+            font-size: 10px;
+            color: #737373;
+            text-transform: uppercase;
+            letter-spacing: 0.2px;
+        }
+
+        /* Hidden template */
+        .post-template {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Main Content Area -->
+        <div class="main-content">
+            <!-- NYU Feed Carousel -->
+            <div class="feed-page">
+                <!-- Return to Survey Button -->
+                <button class="return-survey-btn" id="return-survey-btn">
+                    ← Return to Survey
+                </button>
+                
+                <!-- Tap to Start Overlay -->
+                <div class="tap-to-start-overlay" id="tap-to-start-overlay">
+                    <div class="tap-to-start-icon">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M8 5v14l11-7z"/>
+                        </svg>
+                    </div>
+                    <div class="tap-to-start-text">Tap to Start</div>
+                </div>
+                
+                <div class="feed-container">
+                    <div class="ig-header">
+                        <div class="ig-logo">Instagram</div>
+                        <div class="header-icons">
+                            <svg class="heart-icon" viewBox="0 0 24 24">
+                                <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                            </svg>
+                            <svg class="messenger-icon" viewBox="0 0 24 24">
+                                <path d="M12 2C6.48 2 2 6.48 2 12c0 1.54.36 2.98.97 4.29L1 23l6.71-1.97C9.02 21.64 10.46 22 12 22c5.52 0 10-4.48 10-10S17.52 2 12 2zm0 18c-1.25 0-2.45-.2-3.57-.57L7 20l.57-1.43C7.2 17.45 7 16.25 7 15c0-2.76 2.24-5 5-5s5 2.24 5 5-2.24 5-5 5z"/>
+                                <path d="M8 10l3 3 5-5"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- NYU Carousel Post -->
+                    <div class="posts-container">
+                        <div class="post">
+                            <div class="post-header">
+                                <div class="post-user">
+                                    <div class="profile-pic">
+                                        <img src="assets/images/nyupfp.png" alt="Profile">
+                                    </div>
+                                    <div>
+                                        <div class="username">nyu_stern</div>
+                                        <div class="post-location">Sponsored</div>
+                                    </div>
+                                </div>
+                                <button class="post-more">⋯</button>
+                            </div>
+                            <div class="post-media">
+                                <div class="feed-carousel">
+                                    <img src="assets/images/Exp-Images/NYU1.png" alt="Carousel image 1" class="active">
+                                    <img src="assets/images/Exp-Images/NYU Stern MBA_ Global Impact.png" alt="Carousel image 2">
+                                    <img src="assets/images/Exp-Images/NYU4.png" alt="Carousel image 3">
+                                    <img src="assets/images/Exp-Images/NYU2.png" alt="Carousel image 4">
+                                    <div class="carousel-dots">
+                                        <div class="carousel-dot active" onclick="showCarouselImage(this, 0)"></div>
+                                        <div class="carousel-dot" onclick="showCarouselImage(this, 1)"></div>
+                                        <div class="carousel-dot" onclick="showCarouselImage(this, 2)"></div>
+                                        <div class="carousel-dot" onclick="showCarouselImage(this, 3)"></div>
+                                    </div>
+                                    <div class="ad-badge">Sponsored</div>
+                                </div>
+                            </div>
+                            <div class="post-actions">
+                                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                                </svg>
+                                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                                </svg>
+                                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                                </svg>
+                                <svg class="action-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>
+                                </svg>
+                            </div>
+                            <div class="likes-count">3,456 likes</div>
+                            <div class="post-caption"><strong>nyu_stern</strong> NYU Stern MBA: Global Impact Starts Here 🌍 Join the next generation of business leaders! #NYUStern #MBA #Leadership</div>
+                            <div class="post-comments">View all 189 comments</div>
+                            <div class="post-timestamp">3 hours ago</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simple carousel navigation function
+        function showCarouselImage(clickedDot, index) {
+            const carousel = clickedDot.closest('.feed-carousel');
+            const images = carousel.querySelectorAll('img');
+            const dots = carousel.querySelectorAll('.carousel-dot');
+            
+            // Hide all images and remove active from all dots
+            images.forEach(img => img.classList.remove('active'));
+            dots.forEach(dot => dot.classList.remove('active'));
+            
+            // Show clicked image and activate clicked dot
+            images[index].classList.add('active');
+            clickedDot.classList.add('active');
+            
+            console.log('Switched to image', index);
+        }
+
+        // Function to navigate carousel programmatically
+        function navigateCarousel(carousel, direction) {
+            const images = carousel.querySelectorAll('img');
+            const dots = carousel.querySelectorAll('.carousel-dot');
+            let currentIndex = Array.from(images).findIndex(img => img.classList.contains('active'));
+            
+            if (direction === 'next' && currentIndex < images.length - 1) {
+                currentIndex++;
+            } else if (direction === 'prev' && currentIndex > 0) {
+                currentIndex--;
+            } else {
+                return; // No navigation needed
+            }
+            
+            // Hide all images and remove active from all dots
+            images.forEach(img => img.classList.remove('active'));
+            dots.forEach(dot => dot.classList.remove('active'));
+            
+            // Show new image and activate corresponding dot
+            images[currentIndex].classList.add('active');
+            dots[currentIndex].classList.add('active');
+            
+            console.log('Navigated to image', currentIndex);
+        }
+
+        // Initialize carousel swipe functionality
+        function initializeCarouselSwipe() {
+            const carousels = document.querySelectorAll('.feed-carousel');
+            
+            carousels.forEach(carousel => {
+                let startX = 0;
+                let startY = 0;
+                let isDragging = false;
+                
+                // Touch events for mobile
+                carousel.addEventListener('touchstart', (e) => {
+                    startX = e.touches[0].clientX;
+                    startY = e.touches[0].clientY;
+                    isDragging = true;
+                }, { passive: true });
+                
+                carousel.addEventListener('touchend', (e) => {
+                    if (!isDragging) return;
+                    
+                    const endX = e.changedTouches[0].clientX;
+                    const endY = e.changedTouches[0].clientY;
+                    const diffX = startX - endX;
+                    const diffY = startY - endY;
+                    
+                    // Only trigger if it's clearly a horizontal swipe (2x more horizontal than vertical)
+                    if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY) * 2) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        if (diffX > 0) {
+                            // Swiped left - next image
+                            navigateCarousel(carousel, 'next');
+                        } else {
+                            // Swiped right - previous image
+                            navigateCarousel(carousel, 'prev');
+                        }
+                    }
+                    
+                    isDragging = false;
+                }, { passive: false });
+                
+                // Mouse events for desktop
+                carousel.addEventListener('mousedown', (e) => {
+                    startX = e.clientX;
+                    startY = e.clientY;
+                    isDragging = true;
+                    e.preventDefault(); // Prevent image drag
+                });
+                
+                carousel.addEventListener('mouseup', (e) => {
+                    if (!isDragging) return;
+                    
+                    const endX = e.clientX;
+                    const endY = e.clientY;
+                    const diffX = startX - endX;
+                    const diffY = startY - endY;
+                    
+                    // Only trigger if it's clearly a horizontal drag (2x more horizontal than vertical)
+                    if (Math.abs(diffX) > 50 && Math.abs(diffX) > Math.abs(diffY) * 2) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        
+                        if (diffX > 0) {
+                            // Dragged left - next image
+                            navigateCarousel(carousel, 'next');
+                        } else {
+                            // Dragged right - previous image
+                            navigateCarousel(carousel, 'prev');
+                        }
+                    }
+                    
+                    isDragging = false;
+                });
+                
+                // Prevent context menu on long press
+                carousel.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                });
+                
+                // Reset dragging state on mouse leave
+                carousel.addEventListener('mouseleave', () => {
+                    isDragging = false;
+                });
+            });
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            // Return to Survey functionality
+            const returnSurveyBtn = document.getElementById('return-survey-btn');
+            returnSurveyBtn.addEventListener('click', () => {
+                // Simple navigation back to previous page
+                if (document.referrer && document.referrer !== window.location.href) {
+                    // Go back to the page that linked here
+                    window.location.href = document.referrer;
+                } else {
+                    // Fallback: use browser back button
+                    window.history.back();
+                }
+            });
+            
+            // Tap to Start functionality
+            const tapToStartOverlay = document.getElementById('tap-to-start-overlay');
+            tapToStartOverlay.addEventListener('click', () => {
+                console.log('Tap to start clicked');
+                tapToStartOverlay.classList.add('hidden');
+            });
+            
+            // Initialize carousel swipe functionality
+            initializeCarouselSwipe();
+            
+            // CTA click tracking
+            document.querySelectorAll('.action-icon').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    
+                    let actionType = 'unknown';
+                    const svg = button;
+                    if (svg) {
+                        const path = svg.querySelector('path');
+                        if (path) {
+                            const d = path.getAttribute('d');
+                            if (d.includes('M20.84 4.61')) actionType = 'like';
+                            else if (d.includes('M21 15a2')) actionType = 'comment';
+                            else if (d.includes('M22 2L11 13')) actionType = 'share';
+                            else if (d.includes('M19 21l-7-5')) actionType = 'save';
+                        }
+                    }
+                    
+                    console.log(`CTA clicked: ${actionType}`);
+                    
+                    if (window.GALite && window.GALite.track) {
+                        window.GALite.track('cta_click', {
+                            cta_type: actionType,
+                            post_type: 'feed_carousel',
+                            carousel_id: 'feed_carousel_1',
+                            study_id: 'instagram_study'
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
