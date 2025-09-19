@@ -1,6 +1,7 @@
 /**
  * GA4 Feed Carousel Tracking
- * Tracks carousel interactions in Instagram feed format
+ * Uses the same sophisticated tracking method as reel carousel
+ * Adapted for feed carousel structure (.feed-carousel)
  */
 
 (function() {
@@ -9,36 +10,90 @@
     // Configuration
     const MIN_DWELL_MS = 2000; // Minimum dwell time to count as "viewed"
     
-    // Tracking state for each carousel
-    let carouselTrackers = new Map();
+    // Tracking state
+    let carouselState = {
+        isStarted: false,
+        totalSlides: 0,
+        currentSlide: 0,
+        slideStartTime: null,
+        slideViewedFlags: [], // Track which slides have been viewed long enough
+        totalDwellTime: 0,
+        slideHistory: [] // Track all slide visits with dwell times
+    };
     
     /**
-     * Initialize carousel tracking for a specific carousel
+     * Initialize carousel tracking
      */
-    function initCarouselTracker(carouselId) {
-        return {
-            carouselId: carouselId,
-            isStarted: false,
-            totalSlides: 0,
-            currentSlide: 0,
-            slideStartTime: null,
-            slideViewedFlags: [], // Track which slides have been viewed long enough
-            totalDwellTime: 0,
-            slideHistory: [], // Track all slide visits with dwell times
-            startTime: Date.now()
-        };
+    function initCarouselTracking() {
+        // Wait for GALite to be available
+        if (!window.GALite) {
+            setTimeout(initCarouselTracking, 100);
+            return;
+        }
+        
+        // Find carousel slides (adapt to feed carousel structure)
+        const carousel = document.querySelector('.feed-carousel');
+        const slides = carousel ? carousel.querySelectorAll('img') : [];
+        
+        if (slides.length === 0) {
+            return; // No carousel found
+        }
+        
+        carouselState.totalSlides = slides.length;
+        carouselState.slideViewedFlags = new Array(slides.length).fill(false);
+        
+        console.log(`🎠 Initialized feed carousel with ${slides.length} slides`);
+        
+        // Set up navigation button listeners
+        setupNavigationListeners();
+        
+        // Wait for tap-to-start before beginning tracking
+        waitForTapToStart();
+    }
+    
+    /**
+     * Wait for tap-to-start before beginning carousel tracking
+     */
+    function waitForTapToStart() {
+        const tapOverlay = document.getElementById('tap-to-start-overlay');
+        if (!tapOverlay) {
+            // No tap-to-start overlay, begin tracking immediately
+            startCarouselTracking();
+            return;
+        }
+        
+        // Check if overlay is already hidden
+        if (tapOverlay.classList.contains('hidden') || 
+            window.getComputedStyle(tapOverlay).display === 'none') {
+            startCarouselTracking();
+            return;
+        }
+        
+        // Wait for tap-to-start click
+        tapOverlay.addEventListener('click', startCarouselTracking, { once: true });
+    }
+    
+    /**
+     * Start carousel tracking after tap-to-start
+     */
+    function startCarouselTracking() {
+        trackCarouselStart();
+        trackSlideView(0, 'start');
+        carouselState.slideStartTime = Date.now();
     }
     
     /**
      * Track carousel start event
      */
-    function trackCarouselStart(carouselId) {
-        console.log(`🎠 Carousel ${carouselId} started`);
-        
-        if (window.GALite && window.GALite.track) {
+    function trackCarouselStart() {
+        if (!carouselState.isStarted) {
+            carouselState.isStarted = true;
+            console.log('🎠 Carousel started');
+            
             window.GALite.track('carousel_start', {
-                carousel_id: carouselId,
+                carousel_id: 'feed_carousel_1',
                 carousel_type: 'feed_carousel',
+                total_slides: carouselState.totalSlides,
                 study_id: 'instagram_study'
             });
         }
@@ -47,216 +102,197 @@
     /**
      * Track slide view event
      */
-    function trackSlideView(carouselId, slideIndex, totalSlides) {
-        const tracker = carouselTrackers.get(carouselId);
-        if (!tracker) return;
+    function trackSlideView(slideIndex, direction = 'unknown') {
+        console.log(`👁️ Slide ${slideIndex} viewed (${direction})`);
         
-        // End previous slide dwell if exists
-        if (tracker.slideStartTime !== null && tracker.currentSlide !== slideIndex) {
-            trackDwellEnd(carouselId, tracker.currentSlide);
-        }
+        window.GALite.track('slide_view', {
+            carousel_id: 'feed_carousel_1',
+            carousel_type: 'feed_carousel',
+            slide_index: slideIndex,
+            total_slides: carouselState.totalSlides,
+            direction: direction,
+            study_id: 'instagram_study'
+        });
         
-        // Start new slide tracking
-        tracker.currentSlide = slideIndex;
-        tracker.slideStartTime = Date.now();
-        
-        console.log(`👁️ Slide ${slideIndex} viewed in carousel ${carouselId}`);
-        
-        if (window.GALite && window.GALite.track) {
-            window.GALite.track('slide_view', {
-                carousel_id: carouselId,
-                slide_index: slideIndex,
-                total_slides: totalSlides,
-                carousel_type: 'feed_carousel',
-                study_id: 'instagram_study'
-            });
-        }
+        carouselState.currentSlide = slideIndex;
     }
     
     /**
-     * Track dwell end for a slide
+     * Track dwell end event when leaving a slide
      */
-    function trackDwellEnd(carouselId, slideIndex) {
-        const tracker = carouselTrackers.get(carouselId);
-        if (!tracker || tracker.slideStartTime === null) return;
-        
-        const dwellMs = Date.now() - tracker.slideStartTime;
-        
+    function trackDwellEnd(slideIndex, dwellMs) {
         // Only track if dwell time meets minimum threshold
         if (dwellMs >= MIN_DWELL_MS) {
-            tracker.totalDwellTime += dwellMs;
-            tracker.slideHistory.push({
-                slideIndex: slideIndex,
-                dwellMs: dwellMs,
-                timestamp: Date.now()
-            });
-            
-            // Mark slide as viewed if not already
-            if (!tracker.slideViewedFlags[slideIndex]) {
-                tracker.slideViewedFlags[slideIndex] = true;
-            }
-            
             console.log(`⏱️ Slide ${slideIndex} dwell end: ${dwellMs}ms`);
             
-            if (window.GALite && window.GALite.track) {
-                window.GALite.track('dwell_end', {
-                    carousel_id: carouselId,
-                    slide_index: slideIndex,
-                    dwell_ms: dwellMs,
-                    carousel_type: 'feed_carousel',
-                    study_id: 'instagram_study'
-                });
-            }
+            window.GALite.track('dwell_end', {
+                carousel_id: 'feed_carousel_1',
+                carousel_type: 'feed_carousel',
+                slide_index: slideIndex,
+                dwell_ms: dwellMs,
+                study_id: 'instagram_study'
+            });
+            
+            // Mark slide as viewed
+            carouselState.slideViewedFlags[slideIndex] = true;
         }
         
-        tracker.slideStartTime = null;
+        // Add to total dwell time
+        carouselState.totalDwellTime += dwellMs;
+        
+        // Store in history
+        carouselState.slideHistory.push({
+            slideIndex: slideIndex,
+            dwellMs: dwellMs,
+            timestamp: Date.now()
+        });
+    }
+    
+    /**
+     * Handle slide change
+     */
+    function handleSlideChange(newSlideIndex, direction) {
+        const now = Date.now();
+        
+        // Calculate dwell time for previous slide
+        if (carouselState.slideStartTime !== null) {
+            const dwellMs = now - carouselState.slideStartTime;
+            trackDwellEnd(carouselState.currentSlide, dwellMs);
+        }
+        
+        // Track new slide view
+        trackSlideView(newSlideIndex, direction);
+        
+        // Update state
+        carouselState.slideStartTime = now;
     }
     
     /**
      * Track carousel completion
      */
-    function trackCarouselComplete(carouselId) {
-        const tracker = carouselTrackers.get(carouselId);
-        if (!tracker) return;
-        
-        // End current slide dwell
-        if (tracker.slideStartTime !== null) {
-            trackDwellEnd(carouselId, tracker.currentSlide);
+    function trackCarouselComplete() {
+        // Calculate final dwell time for current slide
+        if (carouselState.slideStartTime !== null) {
+            const dwellMs = Date.now() - carouselState.slideStartTime;
+            trackDwellEnd(carouselState.currentSlide, dwellMs);
+            carouselState.slideStartTime = null;
         }
         
-        const viewedSlides = tracker.slideViewedFlags.filter(Boolean).length;
-        const completionRate = (viewedSlides / tracker.totalSlides) * 100;
+        // Calculate completion metrics
+        const viewedSlides = carouselState.slideViewedFlags.filter(Boolean).length;
+        const completionRate = (viewedSlides / carouselState.totalSlides) * 100;
+        const allViewed = carouselState.slideViewedFlags.every(viewed => viewed);
         
-        console.log(`✅ Carousel ${carouselId} completed - ${viewedSlides}/${tracker.totalSlides} slides viewed`);
+        console.log(`✅ Carousel completed - ${viewedSlides}/${carouselState.totalSlides} slides viewed`);
         
-        if (window.GALite && window.GALite.track) {
-            window.GALite.track('carousel_complete', {
-                carousel_id: carouselId,
-                slides_viewed: viewedSlides,
-                total_slides: tracker.totalSlides,
-                completion_rate: Math.round(completionRate),
-                total_dwell_ms: tracker.totalDwellTime,
-                carousel_type: 'feed_carousel',
-                study_id: 'instagram_study'
-            });
-        }
+        window.GALite.track('carousel_complete', {
+            carousel_id: 'feed_carousel_1',
+            carousel_type: 'feed_carousel',
+            slides_viewed: viewedSlides,
+            total_slides: carouselState.totalSlides,
+            completion_rate: Math.round(completionRate),
+            total_dwell_ms: carouselState.totalDwellTime,
+            all_viewed: allViewed,
+            study_id: 'instagram_study'
+        });
     }
     
     /**
-     * Set up carousel navigation listeners
+     * Set up navigation listeners for feed carousel system
      */
-    function setupCarouselNavigation() {
-        // Find all feed carousels
-        const carousels = document.querySelectorAll('.feed-carousel');
+    function setupNavigationListeners() {
+        const carousel = document.querySelector('.feed-carousel');
+        if (!carousel) return;
         
-        carousels.forEach((carousel, carouselIndex) => {
-            const carouselId = `feed_carousel_${carouselIndex + 1}`;
-            const images = carousel.querySelectorAll('img');
-            const dots = carousel.querySelectorAll('.carousel-dot');
-            
-            if (!images.length) return;
-            
-            // Initialize tracker
-            const tracker = initCarouselTracker(carouselId);
-            tracker.totalSlides = images.length;
-            carouselTrackers.set(carouselId, tracker);
-            
-            console.log(`🎠 Initialized carousel ${carouselId} with ${images.length} slides`);
-            
-            // Track carousel start
-            trackCarouselStart(carouselId);
-            
-            // Track initial slide view
-            trackSlideView(carouselId, 0, images.length);
-            
-            // Monitor for slide changes by watching for active class changes
-            const observer = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                    if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                        const target = mutation.target;
-                        if (target.tagName === 'IMG' && target.classList.contains('active')) {
-                            const slideIndex = Array.from(images).indexOf(target);
-                            if (slideIndex !== -1) {
-                                trackSlideView(carouselId, slideIndex, images.length);
-                            }
+        const images = carousel.querySelectorAll('img');
+        const dots = carousel.querySelectorAll('.carousel-dot');
+        
+        // Monitor for active class changes on images
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+                    const target = mutation.target;
+                    if (target.tagName === 'IMG' && target.classList.contains('active')) {
+                        const slideIndex = Array.from(images).indexOf(target);
+                        if (slideIndex !== -1 && slideIndex !== carouselState.currentSlide) {
+                            const direction = slideIndex > carouselState.currentSlide ? 'next' : 'prev';
+                            handleSlideChange(slideIndex, direction);
                         }
                     }
-                });
-            });
-            
-            // Observe all images for class changes
-            images.forEach(img => {
-                observer.observe(img, { attributes: true, attributeFilter: ['class'] });
+                }
             });
         });
-    }
-    
-    /**
-     * Set up page unload tracking
-     */
-    function setupUnloadTracking() {
-        const handleUnload = () => {
-            // Complete all active carousels
-            carouselTrackers.forEach((tracker, carouselId) => {
-                trackCarouselComplete(carouselId);
-            });
-        };
         
-        window.addEventListener('beforeunload', handleUnload);
-        window.addEventListener('pagehide', handleUnload);
-        
-        document.addEventListener('visibilitychange', () => {
-            if (document.hidden) {
-                handleUnload();
-            }
+        // Observe all images for class changes
+        images.forEach(img => {
+            observer.observe(img, { attributes: true, attributeFilter: ['class'] });
         });
-    }
-    
-    /**
-     * Wait for "Tap to Start" to enable tracking
-     */
-    function waitForTapToStart() {
-        const tapOverlay = document.getElementById('tap-to-start-overlay');
-        if (tapOverlay) {
-            tapOverlay.addEventListener('click', () => {
-                console.log('Tap to Start clicked - Feed carousel tracking enabled');
-                
-                // Set up carousel tracking after tap to start
+        
+        // Also listen for dot clicks directly
+        dots.forEach((dot, index) => {
+            dot.addEventListener('click', () => {
                 setTimeout(() => {
-                    setupCarouselNavigation();
-                    setupUnloadTracking();
-                }, 500);
+                    if (index !== carouselState.currentSlide) {
+                        handleSlideChange(index, 'jump');
+                    }
+                }, 50);
             });
-        } else {
-            // No tap to start overlay, initialize immediately
-            setupCarouselNavigation();
-            setupUnloadTracking();
-        }
+        });
+        
+        // Listen for touch/swipe events on carousel
+        let lastSlideIndex = 0;
+        carousel.addEventListener('touchend', () => {
+            setTimeout(() => {
+                const activeImg = carousel.querySelector('img.active');
+                if (activeImg) {
+                    const currentSlideIndex = Array.from(images).indexOf(activeImg);
+                    if (currentSlideIndex !== -1 && currentSlideIndex !== lastSlideIndex) {
+                        const direction = currentSlideIndex > lastSlideIndex ? 'next' : 'prev';
+                        if (currentSlideIndex !== carouselState.currentSlide) {
+                            handleSlideChange(currentSlideIndex, direction);
+                        }
+                        lastSlideIndex = currentSlideIndex;
+                    }
+                }
+            }, 50);
+        });
     }
     
     /**
-     * Initialize carousel tracking
+     * Handle page unload - track final dwell time and completion
      */
-    function initCarouselTracking() {
-        console.log('Initializing feed carousel tracking...');
-        
-        // Wait for GALite to be available
-        if (!window.GALite) {
-            setTimeout(initCarouselTracking, 100);
-            return;
+    function handlePageUnload() {
+        if (carouselState.slideStartTime !== null) {
+            const dwellMs = Date.now() - carouselState.slideStartTime;
+            trackDwellEnd(carouselState.currentSlide, dwellMs);
         }
         
-        // Wait for tap to start or initialize immediately
-        waitForTapToStart();
-        
-        console.log('Feed carousel tracking initialized');
+        // Track completion on unload
+        trackCarouselComplete();
     }
     
-    // Auto-initialize when DOM is ready
+    // Initialize when DOM is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initCarouselTracking);
     } else {
         initCarouselTracking();
     }
+    
+    // Track final dwell time and completion on page unload
+    window.addEventListener('beforeunload', handlePageUnload);
+    window.addEventListener('pagehide', handlePageUnload);
+    
+    // Handle visibility changes (tab switch, etc.)
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            handlePageUnload();
+        }
+    });
+    
+    // Expose for debugging (optional)
+    window.CarouselTracker = {
+        getState: () => ({ ...carouselState }),
+        MIN_DWELL_MS: MIN_DWELL_MS
+    };
     
 })();
