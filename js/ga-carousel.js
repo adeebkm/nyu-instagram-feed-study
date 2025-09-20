@@ -267,8 +267,10 @@
             trackDwellEnd(carouselState.currentSlide, dwellMs);
         }
         
-        // Track completion on unload
-        trackCarouselComplete();
+        // Only track completion if carousel was actually started
+        if (carouselState.isStarted) {
+            trackCarouselComplete();
+        }
     }
     
     // Initialize when DOM is ready
@@ -296,3 +298,9 @@
     };
     
 })();
+
+
+
+
+
+
