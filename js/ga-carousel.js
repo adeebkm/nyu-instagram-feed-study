@@ -121,19 +121,19 @@
      * Track dwell end event when leaving a slide
      */
     function trackDwellEnd(slideIndex, dwellMs) {
-        // Only track if dwell time meets minimum threshold
+        // Track ALL dwell times (removed minimum threshold to capture brief interactions)
+        console.log(`⏱️ Slide ${slideIndex} dwell end: ${dwellMs}ms`);
+        
+        window.GALite.track('dwell_end', {
+            carousel_id: 'feed_carousel_1',
+            carousel_type: 'feed_carousel',
+            slide_index: slideIndex,
+            dwell_ms: dwellMs,
+            study_id: 'instagram_study'
+        });
+        
+        // Mark slide as viewed if they spent reasonable time (keep this for completion logic)
         if (dwellMs >= MIN_DWELL_MS) {
-            console.log(`⏱️ Slide ${slideIndex} dwell end: ${dwellMs}ms`);
-            
-            window.GALite.track('dwell_end', {
-                carousel_id: 'feed_carousel_1',
-                carousel_type: 'feed_carousel',
-                slide_index: slideIndex,
-                dwell_ms: dwellMs,
-                study_id: 'instagram_study'
-            });
-            
-            // Mark slide as viewed
             carouselState.slideViewedFlags[slideIndex] = true;
         }
         
